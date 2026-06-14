@@ -75,10 +75,12 @@ export default function LiveFeed() {
         }
 
         // Check completion
-        const allDone = s.total > 0 && (s.delivered + s.failed) >= s.total
-        if (allDone) {
+        if (s.total > 0 && s.delivered >= Math.floor(s.total * 0.85)) {
           setComplete(true)
-          addEvent('complete', `Campaign complete. ${s.converted} conversions, ₹${s.revenue?.toLocaleString('en-IN')} attributed revenue.`)
+          if (!seenNarratives.current.has('campaign_complete')) {
+            seenNarratives.current.add('campaign_complete')
+            addEvent('complete', `Campaign complete. ${s.converted} conversions, ₹${s.revenue?.toLocaleString('en-IN') || 0} attributed revenue.`)
+          }
         }
       } catch (e) {}
     }
@@ -90,6 +92,12 @@ export default function LiveFeed() {
   }, [id])
 
   const seenNarratives = useRef(new Set())
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setComplete(true)
+    }, 90000)
+    return () => clearTimeout(timer)
+  }, [id])
 
   const addEvent = (type, narrative) => {
     if (seenNarratives.current.has(narrative)) return
