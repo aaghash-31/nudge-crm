@@ -63,12 +63,6 @@ export default function PostMortem() {
           <p className="text-xl font-bold leading-snug">{postmortem.headline}</p>
         </div>
 
-        <div className="bg-indigo-600 text-white rounded-2xl p-6 mb-6">
-            <p className="text-xs font-semibold uppercase tracking-wide text-indigo-200 mb-2">AI Analysis</p>
-            <p className="text-xl font-bold leading-snug">
-                {postmortem.headline || `Campaign reached ${actuals.total_sent} customers with ${(actuals.open_rate * 100).toFixed(0)}% open rate vs predicted ${(predictions.open_rate * 100).toFixed(0)}%`}
-            </p>
-        </div>
 
         {/* Prediction vs Actual */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-6">
