@@ -37,48 +37,73 @@ export default function LiveFeed() {
   }, [id])
 
   // SSE connection
-  useEffect(() => {
-    const es = new EventSource(`${API}/campaigns/${id}/events`)
+ useEffect(() => {
+    let es = null
+    let reconnectTimer = null
 
-    es.onmessage = (e) => {
+    const connect = () => {
+      es = new EventSource(`${API}/campaigns/${id}/events`)
+
+      es.onmessage = (e) => {
         const data = JSON.parse(e.data)
 
         if (data.stats) {
-            setStats(data.stats)
+          setStats(data.stats)
         }
 
-        // Only show real delivery events once
         if (!['heartbeat', 'waiting', 'complete'].includes(data.event_type)) {
-            setEvents(prev => {
-            // Prevent duplicate narratives
-            const alreadyExists = prev.some(ev => ev.narrative === data.narrative && ev.type === data.event_type)
+          setEvents(prev => {
+            const alreadyExists = prev.some(
+              ev => ev.narrative === data.narrative && ev.type === data.event_type
+            )
             if (alreadyExists) return prev
             return [{
-                id: Date.now() + Math.random(),
-                type: data.event_type,
-                narrative: data.narrative,
-                time: new Date().toLocaleTimeString()
+              id: Date.now() + Math.random(),
+              type: data.event_type,
+              narrative: data.narrative,
+              time: new Date().toLocaleTimeString()
             }, ...prev]
-            })
+          })
         }
 
         if (data.event_type === 'complete') {
-            setComplete(true)
-            es.close()
+          setComplete(true)
+          es.close()
         }
-        if (data.event_type === 'heartbeat') {
-            // Just update stats silently, no feed item
-            return
-        }
+      }
+
+      es.onerror = () => {
+        es.close()
+        // Reconnect after 3 seconds
+        reconnectTimer = setTimeout(connect, 3000)
+      }
     }
 
-    es.onerror = () => {
-      es.close()
-      setComplete(true)
-    }
+    connect()
 
-    return () => es.close()
+    return () => {
+      if (es) es.close()
+      if (reconnectTimer) clearTimeout(reconnectTimer)
+    }
   }, [id])
+
+  // Polling fallback for production (SSE may disconnect on free tier)
+useEffect(() => {
+  const interval = setInterval(async () => {
+    try {
+      const r = await axios.get(`${API}/campaigns/${id}`)
+      const s = r.data.stats
+      if (s) setStats(s)
+      if (s.total > 0) {
+        const terminal = s.delivered + (s.total - s.delivered)
+        if (s.converted > 0 || s.clicked > 0) {
+          setComplete(true)
+        }
+      }
+    } catch (e) {}
+  }, 8000)
+  return () => clearInterval(interval)
+}, [id])
 
   const openRate = stats.total > 0 ? ((stats.opened / stats.total) * 100).toFixed(1) : 0
   const clickRate = stats.total > 0 ? ((stats.clicked / stats.total) * 100).toFixed(1) : 0
